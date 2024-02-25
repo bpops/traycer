@@ -15,6 +15,7 @@ import array
 from   tqdm    import tqdm
 import numpy as np
 import math
+import random
 
 class ppm:
     """
@@ -380,7 +381,17 @@ class interval:
         Set interval to universe
         """
         self.min = -1*np.inf
-        self.max = -np.inf
+        self.max = -np.inf    
+
+    def clamp(self, x):
+        """
+        Clamp
+        """
+        if x < self.min:
+            return self.min
+        if x > self.max:
+            return self.max
+        return x
 
 class camera():
     """
@@ -415,7 +426,21 @@ class camera():
         self.viewport_width = self.viewport_height * self.image_width / self.image_height
         self.center = point3(0,0,0)
 
-    def render(self, world, aa=False):
+        # calculate the vectors across horizontal and down vertical viewport edges
+        self.viewport_u = vec3(self.viewport_width, 0, 0)
+        self.viewport_v = vec3(0, -1*self.viewport_height, 0)
+
+        # calculate the horizontal and vertical delta vectors from pixel to pixel
+        self.pixel_delta_u = self.viewport_u / self.image_width
+        self.pixel_delta_v = self.viewport_v / self.image_height
+
+        # calculate the location of the upper left pixel
+        self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
+            self.viewport_u/2 - self.viewport_v/2
+        pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
+
+
+    def render(self, world, aa=1):
         """
         Render image
         
@@ -423,8 +448,8 @@ class camera():
         ----------
         world : hittable_list
             world to render
-        aa : bool
-            anti-aliasing
+        aa : int
+            samples per pixel for anti-aliasing (default 1)
         
         Returns
         -------
@@ -432,25 +457,13 @@ class camera():
             rendered image
         """
 
-        # calculate the vectors across horizontal and down vertical viewport edges
-        viewport_u = vec3(self.viewport_width, 0, 0)
-        viewport_v = vec3(0, -1*self.viewport_height, 0)
-
-        # calculate the horizontal and vertical delta vectors from pixel to pixel
-        pixel_delta_u = viewport_u / self.image_width
-        pixel_delta_v = viewport_v / self.image_height
-
-        # calculate the location of the upper left pixel
-        viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
-            viewport_u/2 - viewport_v/2
-        pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v)
-
+        
         # generate pixel by pixel
         image = ppm(width=self.image_width, height=self.image_height)
         for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
             for i in range(self.image_width):
                 hit_rec = hit_record()
-                pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v)
+                pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
                 ray_direction = pixel_center - self.center
                 r = ray(self.center, ray_direction)
                 pixel_color = self.ray_color(r, world)
