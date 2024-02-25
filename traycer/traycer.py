@@ -511,7 +511,7 @@ class camera():
                     pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
                     ray_direction = pixel_center - self.center
                     r = ray(self.center, ray_direction)
-                    pixel_color = self.ray_color(r, world)
+                    pixel_color = self.ray_color(r, max_depth, world)
                 image.write_color(i, j, pixel_color.tuple())
 
         return image
