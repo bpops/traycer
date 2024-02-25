@@ -269,7 +269,7 @@ def random_unit_vector():
 
 def random_on_hemisphere(normal):
     on_unit_sphere = random_unit_vector()
-    if on_unit_sphere.dot(normal) < 0.0: # same hemisphere
+    if on_unit_sphere.dot(normal) > 0.0: # same hemisphere
         return on_unit_sphere
     else:
         return -1*on_unit_sphere
@@ -532,7 +532,7 @@ class camera():
         if depth <= 0:
             return color(0,0,0)
 
-        hit, rec = world.hit(r, ray_t=interval(0, np.inf))
+        hit, rec = world.hit(r, ray_t=interval(0.001, np.inf))
         if hit:
             direction = random_on_hemisphere(rec.normal)
             return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
