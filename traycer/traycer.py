@@ -437,7 +437,7 @@ class camera():
         # calculate the location of the upper left pixel
         self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
             self.viewport_u/2 - self.viewport_v/2
-        pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
+        self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
 
 
     def render(self, world, aa=1):
@@ -456,7 +456,6 @@ class camera():
         image : ppm
             rendered image
         """
-
         
         # generate pixel by pixel
         image = ppm(width=self.image_width, height=self.image_height)
@@ -473,7 +472,6 @@ class camera():
 
     def ray_color(self, r, world):
         hit, rec = world.hit(r, ray_t=interval(0, np.inf))
-        
         if hit:
             return 0.5 * (color(1,1,1) + rec.normal)
 
