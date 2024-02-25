@@ -478,7 +478,7 @@ class camera():
         self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
 
 
-    def render(self, world, aa=False):
+    def render(self, world, aa=False, max_depth=10):
         """
         Render image
         
@@ -488,6 +488,8 @@ class camera():
             world to render
         aa : int
             samples per pixel for anti-aliasing (default 1)
+        max_depth : int
+            maximum  number of ray bounces into scene (default 10)
         
         Returns
         -------
@@ -503,7 +505,7 @@ class camera():
                     pixel_color = color(0,0,0)
                     for a in range(aa):
                         r = self.get_randray(i, j)
-                        pixel_color += self.ray_color(r, world)
+                        pixel_color += self.ray_color(r, max_depth, world)
                     pixel_color /= aa
                 else:
                     pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
@@ -514,11 +516,27 @@ class camera():
 
         return image
 
-    def ray_color(self, r, world):
+    def ray_color(self, r, depth, world):
+        """
+        Determine ray color
+
+        Parameters
+        ----------
+        r : ray
+            tracing ray
+        depth : int
+            maximum number of ray bounces
+        world : hittables_list
+            list of hittables
+        """
+        if depth <= 0:
+            return color(0,0,0)
+
         hit, rec = world.hit(r, ray_t=interval(0, np.inf))
         if hit:
             direction = random_on_hemisphere(rec.normal)
-            return 0.5 * self.ray_color(ray(rec.p, direction), world)
+            return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
+            #return 0.5 * self.ray_color(ray(rec.p, direction), world)
             #return 0.5 * (color(1,1,1) + rec.normal)
 
         unit_direction = r.direction.unit_vector()
