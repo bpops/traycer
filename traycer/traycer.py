@@ -224,7 +224,7 @@ class vec3:
             unit vectors
         """
         return self / self.length()
-    
+
     def tuple(self):
         """
         Return the vector as a tuple
@@ -235,6 +235,44 @@ class vec3:
             x, y, and z components of the vector
         """
         return np.asarray((self.x, self.y, self.z))
+    
+    def randomize(self, min_v=0.0, max_v=1.0):
+        """
+        Randomizes the vector
+
+        Parameters
+        ----------
+        min_v : float
+            minimum value (default 0.0)
+        max_v : float
+            maximum value (default 1.0)
+        """
+        self.x = np.random.uniform(min_v,max_v)
+        self.y = np.random.uniform(min_v,max_v)
+        self.z = np.random.uniform(min_v,max_v)
+
+def random_in_unit_sphere():
+    """
+    Get random vector in unit sphere
+    """
+    while True:
+        p = vec3()
+        p.randomize(-1,1)
+        if p.length_squared() < 1:
+            return p
+
+def random_unit_vector():
+    """
+    Get random vector on the unit sphere
+    """
+    return random_in_unit_sphere().unit_vector()
+
+def random_on_hemisphere(normal):
+    on_unit_sphere = random_unit_vector()
+    if on_unit_sphere.dot(normal) < 0.0: # same hemisphere
+        return on_unit_sphere
+    else:
+        return -1*on_unit_sphere
 
 class color(vec3):
     """
@@ -479,7 +517,9 @@ class camera():
     def ray_color(self, r, world):
         hit, rec = world.hit(r, ray_t=interval(0, np.inf))
         if hit:
-            return 0.5 * (color(1,1,1) + rec.normal)
+            direction = random_on_hemisphere(rec.normal)
+            return 0.5 * self.ray_color(ray(rec.p, direction), world)
+            #return 0.5 * (color(1,1,1) + rec.normal)
 
         unit_direction = r.direction.unit_vector()
         a = 0.5 * (unit_direction.y + 1.0)
