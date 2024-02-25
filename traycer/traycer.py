@@ -440,7 +440,7 @@ class camera():
         self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
 
 
-    def render(self, world, aa=1):
+    def render(self, world, aa=False):
         """
         Render image
         
@@ -461,11 +461,17 @@ class camera():
         image = ppm(width=self.image_width, height=self.image_height)
         for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
             for i in range(self.image_width):
-                hit_rec = hit_record()
-                pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
-                ray_direction = pixel_center - self.center
-                r = ray(self.center, ray_direction)
-                pixel_color = self.ray_color(r, world)
+                if not aa is False:
+                    pixel_color = color(0,0,0)
+                    for a in range(aa):
+                        r = self.get_randray(i, j)
+                        pixel_color += self.ray_color(r, world)
+                    pixel_color /= aa
+                else:
+                    pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
+                    ray_direction = pixel_center - self.center
+                    r = ray(self.center, ray_direction)
+                    pixel_color = self.ray_color(r, world)
                 image.write_color(i, j, pixel_color.tuple())
 
         return image
@@ -479,6 +485,36 @@ class camera():
         a = 0.5 * (unit_direction.y + 1.0)
         return color(1.0,1.0,1.0)*(1.0-a) + color(0.5,0.7,1.0)*a
 
+    def pixel_sample_square(self):
+        """
+        Returns a random point in the square surrounding a pixel at origin
+        """
+        px = -0.5 + np.random.uniform(0.0,1.0)
+        py = -0.5 + np.random.uniform(0.0,1.0)
+        return (px * self.pixel_delta_u) + (py * self.pixel_delta_v)
+
+    def get_randray(self, i, j):
+        """
+        Get Random Ray for pixel at location (i,j)
+        
+        Parameters
+        ----------
+        i : int
+            horizontal pixel location
+        j : int
+            vertical pixel location
+
+        Returns
+        ray : ray
+            random ray
+        """
+
+        pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
+        pixel_sample = pixel_center + self.pixel_sample_square()
+
+        ray_origin = self.center
+        ray_direction = pixel_sample - ray_origin
+        return ray(ray_origin, ray_direction)
 
 class hit_record():
     """
