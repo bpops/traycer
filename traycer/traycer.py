@@ -561,8 +561,11 @@ class camera():
 
         hit, rec = world.hit(r, ray_t=interval(0.001, np.inf))
         if hit:
-            scattered, attenuation = rec.material.scatter(r, rec)
-            return attenuation * self.ray_color(scattered, depth-1, world)
+            scattered, attenuation, absorbed = rec.material.scatter(r, rec)
+            if not absorbed:
+                return attenuation * self.ray_color(scattered, depth-1, world)
+            else:
+                return color(0,0,0)
             #direction = rec.normal + random_unit_vector()
             #return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
             
@@ -812,20 +815,30 @@ class lambertain(material):
     """
     Lambertain material
     """
-    def __init__(self, albedo):
+    def __init__(self, albedo, fuzz=0):
         """
         Initialize lambertain
         
         Parameters
         ----------
         albedo : color
-            albedo
+            albedo color
+        fuzz : float
+            fuzziness less (between 0 and 1)
         """
         self.albedo = albedo
+        self.fuzz = fuzz if fuzz <= 1 else 1
     
     def scatter(self, r_in, rec):
         """
         Scatter
+
+        Parameters
+        ----------
+        r_in : ray
+            incident ray
+        rec : hit_record
+            record of hits
         """
         scatter_direction = rec.normal + random_unit_vector()
 
@@ -833,26 +846,43 @@ class lambertain(material):
         if scatter_direction.near_zero():
             scatter_direction = rec.normal
 
-        scattered = ray(rec.p, scatter_direction)
+        scattered = ray(rec.p, scatter_direction + self.fuzz*random_unit_vector())
+        absorbed = scattered.direction.dot(rec.normal) <= 0
         attenuation = self.albedo
 
-        return scattered, attenuation
+        return scattered, attenuation, absorbed
     
 class metal(material):
     """
     Metal material
+
+    Parameters
+    ----------
+    albedo : color
+        albedo color
+    fuzz : float
+        fuzziness less (between 0 and 1)
     """
 
-    def __init__(self, albedo):
+    def __init__(self, albedo, fuzz=0):
         self.albedo = albedo
+        self.fuzz = fuzz if fuzz <= 1 else 1
         
     def scatter(self, r_in, rec):
         """
         Scatter
+
+        Parameters
+        ----------
+        r_in : ray
+            incident ray
+        rec : hit_record
+            record of hits
         """
         
         reflected = reflect(r_in.direction.unit_vector(), rec.normal)
-        scattered = ray(rec.p, reflected)
+        scattered = ray(rec.p, reflected + self.fuzz*random_unit_vector())
+        absorbed = scattered.direction.dot(rec.normal) <= 0
         attenuation = self.albedo
 
-        return scattered, attenuation
+        return scattered, attenuation, absorbed
