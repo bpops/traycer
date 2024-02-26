@@ -561,11 +561,8 @@ class camera():
 
         hit, rec = world.hit(r, ray_t=interval(0.001, np.inf))
         if hit:
-            #try:
             scattered, attenuation = rec.material.scatter(r, rec)
             return attenuation * self.ray_color(scattered, depth-1, world)
-            #except:
-            #    return color(0,0,0)
             #direction = rec.normal + random_unit_vector()
             #return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
             
@@ -771,18 +768,13 @@ class sphere(hittable):
             root = (-half_b + sqrtd) / a
             if not ray_t.surrounds(root):
                 return False
-        #if (root <= ray_tmin) or (ray_tmax <= root):
-        #    root = (-half_b + sqrtd) / a
-        #    if (root <= ray_tmin) or (ray_tmax <= root):
-        #        return False
-            
+       
         rec.t = root
         rec.p = r.at(rec.t)
         outward_normal = (rec.p - self.center) / self.radius
         rec.set_face_normal(r, outward_normal)
         rec.material = self.material
-        #rec.normal = (rec.p - self.center) / self.radius
- 
+        
         return True
 
         """
