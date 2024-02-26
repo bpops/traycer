@@ -52,6 +52,12 @@ class ppm:
         rgb : int
             RGB color value
         """
+
+        # perform linear to gamma conversion
+        #rgb[0] = linear_to_gamma(rgb[0])
+        #rgb[1] = linear_to_gamma(rgb[1])
+        #rgb[2] = linear_to_gamma(rgb[2])
+
         idx = int((y * self.width + x) * 3)
         self.image[idx:idx+3] = array.array('B', rgb)
 
@@ -155,7 +161,7 @@ class vec3:
         out : vec3
             resulting vector
         """
-        if type(other) is vec3:
+        if type(other) in (vec3, color):
             return self.__class__(self.x * other.x, self.y * other.y, 
                                   self.z * other.z)
         else:
@@ -171,7 +177,7 @@ class vec3:
         out : vec3
             resulting vector
         """
-        if type(other) is vec3:
+        if type(other) in (vec3, color):
             return self.__class__(self.x * other.x, self.y * other.y, 
                                   self.z * other.z)
         else:
@@ -250,6 +256,13 @@ class vec3:
         self.y = np.random.uniform(min_v,max_v)
         self.z = np.random.uniform(min_v,max_v)
 
+    def near_zero(self):
+        """
+        Returns true if the vector is close to zero in all dimensions
+        """
+        s = 1e-8
+        return (np.abs(self.x) < s) and (np.abs(self.y) < s) and (np.abs(self.z) < s)
+
 def random_in_unit_sphere():
     """
     Get random vector in unit sphere
@@ -272,6 +285,21 @@ def random_on_hemisphere(normal):
         return on_unit_sphere
     else:
         return -1*on_unit_sphere
+    
+def reflect(v, n):
+    """
+    Reflect ray off a normal
+    
+    Parameters
+    v : vec3
+        incident ray
+    n : vec3
+        surface normal
+    r : vec3
+        reflected ray
+    """
+    return v - 2*v.dot(n)*n
+
 
 class color(vec3):
     """
@@ -533,11 +561,14 @@ class camera():
 
         hit, rec = world.hit(r, ray_t=interval(0.001, np.inf))
         if hit:
-            direction = random_on_hemisphere(rec.normal)
-            return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
-            #return 0.5 * self.ray_color(ray(rec.p, direction), world)
-            #return 0.5 * (color(1,1,1) + rec.normal)
-
+            #try:
+            scattered, attenuation = rec.material.scatter(r, rec)
+            return attenuation * self.ray_color(scattered, depth-1, world)
+            #except:
+            #    return color(0,0,0)
+            #direction = rec.normal + random_unit_vector()
+            #return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
+            
         unit_direction = r.direction.unit_vector()
         a = 0.5 * (unit_direction.y + 1.0)
         return color(1.0,1.0,1.0)*(1.0-a) + color(0.5,0.7,1.0)*a
@@ -573,6 +604,12 @@ class camera():
         ray_direction = pixel_sample - ray_origin
         return ray(ray_origin, ray_direction)
 
+def linear_to_gamma(linear_component):
+    """
+    Linear to Gamma
+    """
+    return int(math.sqrt(linear_component))
+
 class hit_record():
     """
     Hit Record
@@ -583,6 +620,7 @@ class hit_record():
         self.normal = vec3(0,0,0)
         self.t = 0.0
         self.front_face = None
+        self.material = None
 
     def set_face_normal(self, r, outward_normal):
         """
@@ -680,7 +718,7 @@ class sphere(hittable):
     Sphere
     """
 
-    def __init__(self, center, radius):
+    def __init__(self, center, radius, mat):
         """
         Initialize a new sphere
 
@@ -690,9 +728,12 @@ class sphere(hittable):
             center point of sphere
         radius : float
             radius of sphere
+        mat : material
+            material of sphere
         """
         super().__init__(center)
         self.radius = radius
+        self.material = mat
 
     def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
         """
@@ -739,6 +780,7 @@ class sphere(hittable):
         rec.p = r.at(rec.t)
         outward_normal = (rec.p - self.center) / self.radius
         rec.set_face_normal(r, outward_normal)
+        rec.material = self.material
         #rec.normal = (rec.p - self.center) / self.radius
  
         return True
@@ -762,3 +804,63 @@ class sphere(hittable):
             return (1.0-a)*color(1.0,1.0,1.0) + a*color(0.5,0.7,1.0)
     """
 
+class material():
+    """
+    Material
+    """
+
+    def __init__(self):
+        pass
+
+    def scatter(self, r, rec, atten, scattered):
+        scattered = ray()
+        return scattered
+    
+class lambertain(material):
+    """
+    Lambertain material
+    """
+    def __init__(self, albedo):
+        """
+        Initialize lambertain
+        
+        Parameters
+        ----------
+        albedo : color
+            albedo
+        """
+        self.albedo = albedo
+    
+    def scatter(self, r_in, rec):
+        """
+        Scatter
+        """
+        scatter_direction = rec.normal + random_unit_vector()
+
+        # catch degnerate scatter direction
+        if scatter_direction.near_zero():
+            scatter_direction = rec.normal
+
+        scattered = ray(rec.p, scatter_direction)
+        attenuation = self.albedo
+
+        return scattered, attenuation
+    
+class metal(material):
+    """
+    Metal material
+    """
+
+    def __init__(self, albedo):
+        self.albedo = albedo
+        
+    def scatter(self, r_in, rec):
+        """
+        Scatter
+        """
+        
+        reflected = reflect(r_in.direction.unit_vector(), rec.normal)
+        scattered = ray(rec.p, reflected)
+        attenuation = self.albedo
+
+        return scattered, attenuation
