@@ -472,7 +472,9 @@ class camera():
     """
 
     def __init__(self, aspect_ratio=16.0/9.0, image_width=500, focal_length=1.0,
-                 viewport_height=2.0, center=point3(0,0,0)):
+                 viewport_height=2.0, center=point3(0,0,0), vfov=90,
+                 lookfrom=point3(0,0,1), lookat=point3(0,0,0), 
+                 vup=vec3(0,1,0)):
         """
         Initialize camera
 
@@ -488,27 +490,54 @@ class camera():
             viewport height (default 2.0)
         center : point3
             camera center (default (0,0,0))
+        vfov : float
+            virtual field of view, in degrees
+        lookfrom : point3
+            point camera is looking from
+        lookat : point3
+            point camera is looking at
+        vup : vec3
+            camera relative "up" direction
         """
-        self.aspect_ratio = aspect_ratio
-        self.image_width  = image_width
-        self.image_height = int(image_width/aspect_ratio)
+
+        self.lookfrom = lookfrom
+        self.lookat   = lookat 
+        self.vup      = vup 
 
         # camera
-        self.focal_length = 1.0
-        self.viewport_height = 2.0
-        self.viewport_width = self.viewport_height * self.image_width / self.image_height
-        self.center = point3(0,0,0)
+        self.aspect_ratio    = aspect_ratio
+        self.image_width     = image_width
+        self.image_height    = int(image_width/aspect_ratio)
+        self.vfov            = vfov
+        #self.focal_length    = focal_length
+        self.focal_length    = (lookfrom - lookat).length()
+        self.theta           = np.radians(self.vfov)
+        h = math.tan(self.theta/2.0)
+        self.viewport_height = 2 * h * focal_length
+        #self.viewport_height = viewport_height
+        self.viewport_width  = self.viewport_height * self.image_width / self.image_height
+        #self.center          = center
+        self.center          = lookfrom
+
+        # calculate the u,v,w unit basis vectors for camera coord frame
+        w = (lookfrom - lookat).unit_vector()
+        u = vup.cross(w).unit_vector()
+        v = w.cross(u)
 
         # calculate the vectors across horizontal and down vertical viewport edges
-        self.viewport_u = vec3(self.viewport_width, 0, 0)
-        self.viewport_v = vec3(0, -1*self.viewport_height, 0)
+        #self.viewport_u = vec3(self.viewport_width, 0, 0)
+        #self.viewport_v = vec3(0, -1*self.viewport_height, 0)
+        self.viewport_u = self.viewport_width * u
+        self.viewport_v = self.viewport_height * -1*v
 
         # calculate the horizontal and vertical delta vectors from pixel to pixel
         self.pixel_delta_u = self.viewport_u / self.image_width
         self.pixel_delta_v = self.viewport_v / self.image_height
 
         # calculate the location of the upper left pixel
-        self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
+        #self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
+        #    self.viewport_u/2 - self.viewport_v/2
+        self.viewport_upper_left = self.center - (self.focal_length * w) - \
             self.viewport_u/2 - self.viewport_v/2
         self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
 
