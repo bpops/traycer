@@ -288,7 +288,7 @@ def random_on_hemisphere(normal):
     
 def reflect(v, n):
     """
-    Reflect ray off a normal
+    Reflect a ray
     
     Parameters
     v : vec3
@@ -300,6 +300,14 @@ def reflect(v, n):
     """
     return v - 2*v.dot(n)*n
 
+def refract(uv, n, etai_over_etat):
+    """
+    Refract a ray
+    """
+    cos_theta  = np.min((-1*uv.dot(n), 1.0))
+    r_out_perp = etai_over_etat * (uv + cos_theta*n)
+    r_out_para = -1*math.sqrt(np.abs(1.0 - r_out_perp.length_squared())) * n
+    return r_out_perp + r_out_para
 
 class color(vec3):
     """
@@ -886,3 +894,59 @@ class metal(material):
         attenuation = self.albedo
 
         return scattered, attenuation, absorbed
+    
+class dielectric(material):
+    """
+    Dielectric material
+    """
+
+    def __init__(self, theta):
+        """
+        Initialize a dielectric material
+        
+        Parameters
+        ----------
+        theta : float
+            index of refraction
+        """
+        self.theta = theta
+    
+    def scatter(self, r_in, rec):
+        """
+        Scatter
+
+        Parameters
+        ----------
+        r_in : ray
+            incident ray
+        rec : hit_record
+            record of hits
+        """
+        
+        attenuation = color(1.0, 1.0, 1.0)
+        refraction_ratio = 1.0/self.theta if rec.front_face else self.theta
+
+        unit_direction = r_in.direction.unit_vector()
+        cos_theta = np.min((-1*unit_direction.dot(rec.normal), 1.0))
+        sin_theta = math.sqrt(1.0 - cos_theta**2)
+        cannot_defract = refraction_ratio * sin_theta > 1.0
+
+        if cannot_defract or (self.reflectance(cos_theta, refraction_ratio) > np.random.uniform(0,1)):
+            direction = reflect(unit_direction, rec.normal)
+        else:
+            direction = refract(unit_direction, rec.normal, refraction_ratio)
+
+        #refracted = refract(unit_direction, rec.normal, refraction_ratio)
+
+        scattered = ray(rec.p, direction)
+        absorbed = False
+
+        return scattered, attenuation, absorbed
+    
+    def reflectance(self, cosine, ref_idx):
+        """
+        Use Shlick's approximation for reflectance
+        """
+        r0 = (1-ref_idx) / (1+ref_idx)
+        r0 = r0**2
+        return r0 + (1-r0) * (1-cosine)**5
