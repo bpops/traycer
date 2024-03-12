@@ -273,6 +273,15 @@ def random_in_unit_sphere():
         if p.length_squared() < 1:
             return p
 
+def random_in_unit_disk():
+    """
+    Get random vector in unit disk
+    """
+    while True:
+        p = vec3(np.random.uniform(-1,1), np.random.uniform(-1,1), 0)
+        if p.length_squared() < 1:
+            return p
+
 def random_unit_vector():
     """
     Get random vector on the unit sphere
@@ -474,7 +483,7 @@ class camera():
     def __init__(self, aspect_ratio=16.0/9.0, image_width=500, focal_length=1.0,
                  viewport_height=2.0, center=point3(0,0,0), vfov=90,
                  lookfrom=point3(0,0,1), lookat=point3(0,0,0), 
-                 vup=vec3(0,1,0)):
+                 vup=vec3(0,1,0), defocus_angle=0, focus_dist=10):
         """
         Initialize camera
 
@@ -498,6 +507,11 @@ class camera():
             point camera is looking at
         vup : vec3
             camera relative "up" direction
+        defocus_angle : float
+            variation angle of rays through each pixel (default 0)
+        focus_dist : float
+            distance from camera lookfrom point to plane of perfect focus
+            (default 10)
         """
 
         self.lookfrom = lookfrom
@@ -509,12 +523,15 @@ class camera():
         self.image_width     = image_width
         self.image_height    = int(image_width/aspect_ratio)
         self.vfov            = vfov
+        self.defocus_angle = defocus_angle
+        self.focus_dist    = focus_dist
         #self.focal_length    = focal_length
-        self.focal_length    = (lookfrom - lookat).length()
+        #self.focal_length    = (lookfrom - lookat).length()
         self.theta           = np.radians(self.vfov)
         h = math.tan(self.theta/2.0)
-        self.viewport_height = 2 * h * focal_length
+        #self.viewport_height = 2 * h * focal_length
         #self.viewport_height = viewport_height
+        self.viewport_height = 2 * h * self.focus_dist
         self.viewport_width  = self.viewport_height * self.image_width / self.image_height
         #self.center          = center
         self.center          = lookfrom
@@ -537,10 +554,16 @@ class camera():
         # calculate the location of the upper left pixel
         #self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
         #    self.viewport_u/2 - self.viewport_v/2
-        self.viewport_upper_left = self.center - (self.focal_length * w) - \
-            self.viewport_u/2 - self.viewport_v/2
+        #self.viewport_upper_left = self.center - (self.focal_length * w) - \
+        #    self.viewport_u/2 - self.viewport_v/2
+        self.viewport_upper_left = self.center - (self.focus_dist * w) - \
+            self.viewport_u/2.0 - self.viewport_v/2.0
         self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
 
+        # calculate the camera defocus disk basis vectors
+        defocus_radius = self.focus_dist * np.tan(np.radians(defocus_angle/2.0))
+        self.defocus_disk_u = u * defocus_radius
+        self.defocus_disk_v = v * defocus_radius
 
     def render(self, world, aa=False, max_depth=10):
         """
@@ -620,7 +643,8 @@ class camera():
 
     def get_randray(self, i, j):
         """
-        Get Random Ray for pixel at location (i,j)
+        Get Random Ray for pixel at location (i,j), originating from the
+        camera defocus disk
         
         Parameters
         ----------
@@ -637,9 +661,18 @@ class camera():
         pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
         pixel_sample = pixel_center + self.pixel_sample_square()
 
-        ray_origin = self.center
+        #ray_origin = self.center
+        ray_origin = self.center if (self.defocus_angle <= 0) else self.defocus_disk_sample()
         ray_direction = pixel_sample - ray_origin
         return ray(ray_origin, ray_direction)
+
+    def defocus_disk_sample(self):
+        """
+        Return a random point in the camera defocus disk
+        """
+        p = random_in_unit_disk()
+        return self.center + (p.x * self.defocus_disk_u) + \
+            (p.y * self.defocus_disk_v)
 
 def linear_to_gamma(linear_component):
     """
@@ -750,6 +783,50 @@ class hittable():
     def hit(self, r, ray_t, hit_record):
         pass
 
+class torus(hittable):
+    """
+    Torus
+    """
+
+    def __init__(self, center, radius_i, radius_o):
+        """
+        Initialize a new torus
+        
+        Parameters
+        ----------
+        center : point3
+            center point of torus
+        radius_i : float
+            inner radius
+        radius_o : float
+            outer radius
+        """
+        super().__init__(center)
+        self.radius_i = radius_i
+        self.radius_o = radius_o
+
+    def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
+        """
+        Determine torus color based on ray
+
+        Parameters
+        ----------
+        ray : vec3
+            3d vector of ray
+        ray_tmin : float
+            minimum t
+        ray_tmax : float
+            maximum t
+        rec: hit_record
+            hit record
+        
+        Returns
+        -------
+        out : float
+            color value
+        """
+        pass
+
 class sphere(hittable):
     """
     Sphere
@@ -771,6 +848,8 @@ class sphere(hittable):
         super().__init__(center)
         self.radius = radius
         self.material = mat
+
+        pass
 
     def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
         """
@@ -817,24 +896,6 @@ class sphere(hittable):
         
         return True
 
-        """
-        if discriminant < 0:
-            return -1;
-        else:
-            return (-half_b - math.sqrt(discriminant)) / a
-        """
-        
-    """
-    def ray_color(self, r):
-        t = self.hit(r)
-        if t > 0.0:
-            N = (r.at(t)-vec3(0,0,-1)).unit_vector()
-            return 0.5*color(N.x+1, N.y+1, N.z+1)
-        else:
-            unit_direction = r.direction.unit_vector()
-            a = 0.5*(unit_direction.y+1.0)
-            return (1.0-a)*color(1.0,1.0,1.0) + a*color(0.5,0.7,1.0)
-    """
 
 class material():
     """
