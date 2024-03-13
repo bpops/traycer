@@ -585,23 +585,54 @@ class camera():
         """
         
         # generate pixel by pixel
-        image = ppm(width=self.image_width, height=self.image_height)
+        self.image = ppm(width=self.image_width, height=self.image_height)
         for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
-            for i in range(self.image_width):
-                if not aa is False:
-                    pixel_color = color(0,0,0)
-                    for a in range(aa):
-                        r = self.get_randray(i, j)
-                        pixel_color += self.ray_color(r, max_depth, world)
-                    pixel_color /= aa
-                else:
-                    pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
-                    ray_direction = pixel_center - self.center
-                    r = ray(self.center, ray_direction)
-                    pixel_color = self.ray_color(r, max_depth, world)
-                image.write_color(i, j, pixel_color.tuple())
+            
+        return self.image
 
-        return image
+    def render_scanline(self, line, aa=False, max_depth=10):
+        """
+        Render a scanline
+        
+        Parameters
+        ----------
+        line : int
+            scanline to render
+        aa : int
+            samples per pixel for anti-aliasing (default 1)
+        max_depth : int
+            maximum  number of ray bounces into scene (default 10)
+        """
+        for i in range(self.image_width):
+            self.render_pixel((i,line), aa=aa, max_depth=max_depth)
+    
+
+    def render_pixel(self, coords, aa=False, max_depth=10):
+        """
+        Render a pixel
+        
+        Parameters
+        ----------
+        coords : list
+            x/y coordinates
+        aa : int
+            samples per pixel for anti-aliasing (default 1)
+        max_depth : int
+            maximum  number of ray bounces into scene (default 10)
+        """
+
+        if not aa is False:
+            pixel_color = color(0,0,0)
+            for a in range(aa):
+                r = self.get_randray(i, j)
+                pixel_color += self.ray_color(r, max_depth, world)
+            pixel_color /= aa
+        else:
+            pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
+            ray_direction = pixel_center - self.center
+            r = ray(self.center, ray_direction)
+            pixel_color = self.ray_color(r, max_depth, world)
+        self.image.write_color(i, j, pixel_color.tuple())
 
     def ray_color(self, r, depth, world):
         """
@@ -909,7 +940,7 @@ class material():
         scattered = ray()
         return scattered
     
-class lambertain(material):
+class lambertian(material):
     """
     Lambertain material
     """
