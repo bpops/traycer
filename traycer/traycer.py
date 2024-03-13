@@ -15,6 +15,7 @@ import array
 from   tqdm    import tqdm
 import numpy as np
 import math
+import multiprocessing as mp
 
 class ppm:
     """
@@ -586,33 +587,63 @@ class camera():
         
         # generate pixel by pixel
         self.image = ppm(width=self.image_width, height=self.image_height)
-        for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
-            
+        #pool = multiprocessing.Pool(processes=12)
+        #scanlines = np.linspace(0, self.image_height-1, self.image_height, dtype=np.int32)
+        #tasks = []
+        #for scanline in scanlines:
+        #    tasks.append((world, scanline, aa, max_depth))
+        #print(tasks)
+        self.world = world
+        self.aa = aa
+        self.max_depth = max_depth
+        #for _ in tqdm(pool.imap_unordered(self.render_scanline,
+        #                                  range(self.image_height)),
+        #                                  total=len(scanlines),
+        #                                  desc="Scanlines rendered"):
+        #    pass
+        #for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
+        #    self.render_scanline(j)
+        
+        #for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
+        #    for i in range(self.image_width):
+        #        self.image.write_color(i, j, self.render_pixel((i, j)).tuple())
+
+        pool = mp.Pool()
+        results = [pool.apply_async(self.render_pixel, args=(i,j))
+                      for i in range(self.image_width)
+                          for j in range(self.image_height)
+                  ]
+        output = [p.get() for p in results]
+        output = [p.tuple() for p in output]
+
+        x = 0
+        for i in range(self.image_width):
+            for j in range(self.image_height):
+                self.image.write_color(i, j, output[x])
+                x += 1
+
         return self.image
 
-    def render_scanline(self, line, aa=False, max_depth=10):
-        """
-        Render a scanline
-        
-        Parameters
-        ----------
-        line : int
-            scanline to render
-        aa : int
-            samples per pixel for anti-aliasing (default 1)
-        max_depth : int
-            maximum  number of ray bounces into scene (default 10)
-        """
-        for i in range(self.image_width):
-            self.render_pixel((i,line), aa=aa, max_depth=max_depth)
+    # def render_scanline(self, line):
+    #     """
+    #     Render a scanline
     
-
-    def render_pixel(self, coords, aa=False, max_depth=10):
+    #     Parameters
+    #     ----------
+    #     line : int
+    #         scanline to render
+    #     """
+    #     for i in range(self.image_width):
+    #         self.render_pixel((i,line))
+    
+    def render_pixel(self, i, j):
         """
         Render a pixel
         
         Parameters
         ----------
+        world : hittable_list
+            world to render
         coords : list
             x/y coordinates
         aa : int
@@ -620,19 +651,21 @@ class camera():
         max_depth : int
             maximum  number of ray bounces into scene (default 10)
         """
-
-        if not aa is False:
+        #i = coords[0]
+        #j = coords[1]
+        if not self.aa is False:
             pixel_color = color(0,0,0)
-            for a in range(aa):
+            for a in range(self.aa):
                 r = self.get_randray(i, j)
-                pixel_color += self.ray_color(r, max_depth, world)
-            pixel_color /= aa
+                pixel_color += self.ray_color(r, self.max_depth, self.world)
+            pixel_color /= self.aa
         else:
             pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
             ray_direction = pixel_center - self.center
             r = ray(self.center, ray_direction)
-            pixel_color = self.ray_color(r, max_depth, world)
-        self.image.write_color(i, j, pixel_color.tuple())
+            pixel_color = self.ray_color(r, self.max_depth, self.world)
+        #self.image.write_color(i, j, pixel_color.tuple())
+        return pixel_color
 
     def ray_color(self, r, depth, world):
         """
