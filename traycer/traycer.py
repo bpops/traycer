@@ -12,10 +12,10 @@
 #
 
 import array
-from   tqdm    import tqdm
-import numpy as np
+from   tqdm           import tqdm
+import numpy           as    np
 import math
-import multiprocessing as mp
+import multiprocessing as    mp
 
 class ppm:
     """
@@ -53,11 +53,6 @@ class ppm:
         rgb : int
             RGB color value
         """
-
-        # perform linear to gamma conversion
-        #rgb[0] = linear_to_gamma(rgb[0])
-        #rgb[1] = linear_to_gamma(rgb[1])
-        #rgb[2] = linear_to_gamma(rgb[2])
 
         idx = int((y * self.width + x) * 3)
         self.image[idx:idx+3] = array.array('B', rgb)
@@ -290,6 +285,9 @@ def random_unit_vector():
     return random_in_unit_sphere().unit_vector()
 
 def random_on_hemisphere(normal):
+    """
+    Determine hemisphere
+    """
     on_unit_sphere = random_unit_vector()
     if on_unit_sphere.dot(normal) > 0.0: # same hemisphere
         return on_unit_sphere
@@ -414,13 +412,6 @@ class ray:
             point along ray at distance t
         """
         return self.origin + self.direction * t
-    
-"""
-def ray_color(r):
-    unit_direction = r.direction.unit_vector()
-    a = 0.5 * (unit_direction.y + 1.0)
-    return (1.0-a) * color(1.0,1.0,1.0) + a * color(0.5,0.7,1.0)
-"""
 
 
 class interval:
@@ -524,10 +515,10 @@ class camera():
         self.image_width     = image_width
         self.image_height    = int(image_width/aspect_ratio)
         self.vfov            = vfov
-        self.defocus_angle = defocus_angle
-        self.focus_dist    = focus_dist
+        self.defocus_angle   = defocus_angle
+        self.focus_dist      = focus_dist
         self.theta           = np.radians(self.vfov)
-        h = math.tan(self.theta/2.0)
+        h                    = math.tan(self.theta/2.0)
         self.viewport_height = 2 * h * self.focus_dist
         self.viewport_width  = self.viewport_height * self.image_width / self.image_height
         self.center          = lookfrom
@@ -621,14 +612,8 @@ class camera():
         
         Parameters
         ----------
-        world : hittable_list
-            world to render
         coords : list
             x/y coordinates
-        aa : int
-            samples per pixel for anti-aliasing (default 1)
-        max_depth : int
-            maximum  number of ray bounces into scene (default 10)
         """
         i = coords[0]
         j = coords[1]
@@ -643,7 +628,6 @@ class camera():
             ray_direction = pixel_center - self.center
             r = ray(self.center, ray_direction)
             pixel_color = self.ray_color(r, self.max_depth, self.world)
-        #self.image.write_color(i, j, pixel_color.tuple())
         return pixel_color
 
     def ray_color(self, r, depth, world):
@@ -669,9 +653,7 @@ class camera():
                 return attenuation * self.ray_color(scattered, depth-1, world)
             else:
                 return color(0,0,0)
-            #direction = rec.normal + random_unit_vector()
-            #return 0.5 * self.ray_color(ray(rec.p, direction), depth-1, world)
-            
+
         unit_direction = r.direction.unit_vector()
         a = 0.5 * (unit_direction.y + 1.0)
         return color(1.0,1.0,1.0)*(1.0-a) + color(0.5,0.7,1.0)*a
@@ -704,7 +686,6 @@ class camera():
         pixel_center = self.pixel00_loc + (i*self.pixel_delta_u) + (j*self.pixel_delta_v)
         pixel_sample = pixel_center + self.pixel_sample_square()
 
-        #ray_origin = self.center
         ray_origin = self.center if (self.defocus_angle <= 0) else self.defocus_disk_sample()
         ray_direction = pixel_sample - ray_origin
         return ray(ray_origin, ray_direction)
@@ -1068,8 +1049,6 @@ class dielectric(material):
             direction = reflect(unit_direction, rec.normal)
         else:
             direction = refract(unit_direction, rec.normal, refraction_ratio)
-
-        #refracted = refract(unit_direction, rec.normal, refraction_ratio)
 
         scattered = ray(rec.p, direction)
         absorbed = False
