@@ -526,15 +526,10 @@ class camera():
         self.vfov            = vfov
         self.defocus_angle = defocus_angle
         self.focus_dist    = focus_dist
-        #self.focal_length    = focal_length
-        #self.focal_length    = (lookfrom - lookat).length()
         self.theta           = np.radians(self.vfov)
         h = math.tan(self.theta/2.0)
-        #self.viewport_height = 2 * h * focal_length
-        #self.viewport_height = viewport_height
         self.viewport_height = 2 * h * self.focus_dist
         self.viewport_width  = self.viewport_height * self.image_width / self.image_height
-        #self.center          = center
         self.center          = lookfrom
 
         # calculate the u,v,w unit basis vectors for camera coord frame
@@ -543,8 +538,6 @@ class camera():
         v = w.cross(u)
 
         # calculate the vectors across horizontal and down vertical viewport edges
-        #self.viewport_u = vec3(self.viewport_width, 0, 0)
-        #self.viewport_v = vec3(0, -1*self.viewport_height, 0)
         self.viewport_u = self.viewport_width * u
         self.viewport_v = self.viewport_height * -1*v
 
@@ -553,10 +546,6 @@ class camera():
         self.pixel_delta_v = self.viewport_v / self.image_height
 
         # calculate the location of the upper left pixel
-        #self.viewport_upper_left = self.center - vec3(0, 0, self.focal_length) - \
-        #    self.viewport_u/2 - self.viewport_v/2
-        #self.viewport_upper_left = self.center - (self.focal_length * w) - \
-        #    self.viewport_u/2 - self.viewport_v/2
         self.viewport_upper_left = self.center - (self.focus_dist * w) - \
             self.viewport_u/2.0 - self.viewport_v/2.0
         self.pixel00_loc = self.viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v)
@@ -585,58 +574,48 @@ class camera():
             rendered image
         """
         
-        # generate pixel by pixel
+        # initialize render settings
         self.image = ppm(width=self.image_width, height=self.image_height)
-        #pool = multiprocessing.Pool(processes=12)
-        #scanlines = np.linspace(0, self.image_height-1, self.image_height, dtype=np.int32)
-        #tasks = []
-        #for scanline in scanlines:
-        #    tasks.append((world, scanline, aa, max_depth))
-        #print(tasks)
         self.world = world
         self.aa = aa
         self.max_depth = max_depth
-        #for _ in tqdm(pool.imap_unordered(self.render_scanline,
-        #                                  range(self.image_height)),
-        #                                  total=len(scanlines),
-        #                                  desc="Scanlines rendered"):
-        #    pass
-        #for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
-        #    self.render_scanline(j)
         
-        #for j in tqdm(range(self.image_height), desc="Scanlines rendered"):
-        #    for i in range(self.image_width):
-        #        self.image.write_color(i, j, self.render_pixel((i, j)).tuple())
-
+        # set up tasks
+        pixel_coords = [(i, j) for j in range(self.image_height) for i in range(self.image_width)]
+        n_pixels = self.image_height*self.image_width
+        pbar = tqdm(total=self.image_height*self.image_width, desc="Rendering pixels", unit=" pixel")
         pool = mp.Pool()
-        results = [pool.apply_async(self.render_pixel, args=(i,j))
-                      for i in range(self.image_width)
-                          for j in range(self.image_height)
-                  ]
-        output = [p.get() for p in results]
-        output = [p.tuple() for p in output]
+        results = pool.map_async(self.render_pixel, pixel_coords)      
+ 
+        # wait for all tasks to complete, updating progress bar
+        while not results.ready():
+            num_left = results._number_left * results._chunksize
+            completed_tasks = np.max((n_pixels - num_left, 0))
+            pbar.n = completed_tasks
+            pbar.refresh()
+        
+        # finalize task pool
+        results.wait()
+        output = results.get()
+        pool.close()
+        pool.join()
 
+        # finalize progress bar
+        pbar.n = n_pixels
+        pbar.refresh()
+        pbar.close()
+        
+        # pipe output into the image
+        output = [p.tuple() for p in output]
         x = 0
-        for i in range(self.image_width):
-            for j in range(self.image_height):
+        for j in range(self.image_height):
+            for i in range(self.image_width):
                 self.image.write_color(i, j, output[x])
                 x += 1
 
         return self.image
-
-    # def render_scanline(self, line):
-    #     """
-    #     Render a scanline
     
-    #     Parameters
-    #     ----------
-    #     line : int
-    #         scanline to render
-    #     """
-    #     for i in range(self.image_width):
-    #         self.render_pixel((i,line))
-    
-    def render_pixel(self, i, j):
+    def render_pixel(self, coords):
         """
         Render a pixel
         
@@ -651,8 +630,8 @@ class camera():
         max_depth : int
             maximum  number of ray bounces into scene (default 10)
         """
-        #i = coords[0]
-        #j = coords[1]
+        i = coords[0]
+        j = coords[1]
         if not self.aa is False:
             pixel_color = color(0,0,0)
             for a in range(self.aa):
