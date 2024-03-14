@@ -574,7 +574,7 @@ class camera():
         # set up tasks
         pixel_coords = [(i, j) for j in range(self.image_height) for i in range(self.image_width)]
         n_pixels = self.image_height*self.image_width
-        pbar = tqdm(total=self.image_height*self.image_width, desc="Rendering pixels", unit=" pixel")
+        pbar = tqdm(total=self.image_height*self.image_width, desc="Rendering", unit=" pixels")
         pool = mp.Pool()
         results = pool.map_async(self.render_pixel, pixel_coords)      
  
