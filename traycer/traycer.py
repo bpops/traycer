@@ -598,6 +598,7 @@ class camera():
         
         # pipe output into the image
         output = [p.tuple() for p in output]
+        print(output[0])
         x = 0
         for j in range(self.image_height):
             for i in range(self.image_width):
@@ -617,7 +618,7 @@ class camera():
         """
         i = coords[0]
         j = coords[1]
-        if not self.aa is False:
+        if not self.aa is None:
             pixel_color = color(0,0,0)
             for a in range(self.aa):
                 r = self.get_randray(i, j)
@@ -851,6 +852,27 @@ class torus(hittable):
         """
         pass
 
+    def calc_normal(self, p, direction="outward"):
+        """
+        Calculate normal to surface
+
+        Parameters
+        ----------
+        p : point3
+            point at which to calculate normal
+        direction : str
+            "outward" (default) or "inward"
+        """
+
+        a = self.radius_o
+        b = self.radius_i
+        param_squared = a*a + b*b
+        sum_squared   = p.length_squared()
+        norm_x = 4.0 * p.x * (sum_squared - param_squared)
+        norm_y = 4.0 * p.y * (sum_squared - param_squared + 2.0 * a * a)
+        norm_z = 4.0 * p.z * (sum_squared - param_squared)
+        return vec3(norm_x, norm_y, norm_z).unit_vector()
+
 class sphere(hittable):
     """
     Sphere
@@ -914,11 +936,130 @@ class sphere(hittable):
        
         rec.t = root
         rec.p = r.at(rec.t)
-        outward_normal = (rec.p - self.center) / self.radius
+        outward_normal = self.calc_normal(rec.p, direction="outward")
         rec.set_face_normal(r, outward_normal)
         rec.material = self.material
         
         return True
+
+    def calc_normal(self, p, direction="outward"):
+        """
+        Calculate normal to surface
+
+        Parameters
+        ----------
+        p : point3
+            point at which to calculate normal
+        direction : str
+            "outward" (default) or "inward"
+        """
+
+        if direction == "outward":
+            return (p - self.center) / self.radius
+        elif direction == "inward":
+            return (self.center - p) / self.radius
+
+class cylinder(hittable):
+    """
+    Cylinder
+    """
+
+    def __init__(self, center, radius, length, mat):
+        """
+        Initialize a new cylinder
+
+        Parameters
+        ----------
+        center : point3
+            center point of sphere
+        radius : float
+            radius of sphere
+        length : float
+            length of cylinder
+        mat : material
+            material of sphere
+        """
+        super().__init__(center)
+        self.radius = radius
+        self.length = length
+        self.half_length = length/2.0
+        self.material = mat
+
+    def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
+        """
+        Determine cylinder color based on ray
+
+        Parameters
+        ----------
+        ray : vec3
+            3d vector of ray
+        ray_tmin : float
+            minimum t
+        ray_tmax : float
+            maximum t
+        rec: hit_record
+            hit record
+        
+        Returns
+        -------
+        out : float
+            color value
+        """
+
+        # solve quadratic
+        a = r.direction.x**2 + r.direction.z**2
+        b = 2*(r.direction.x*(r.origin.x-self.center.x) + r.direction.z*(r.origin.z-self.center.z))
+        c = (r.origin.x-self.center.x)**2 + \
+            (r.origin.z-self.center.z)**2 - \
+                self.radius**2
+        discriminant = b**2 - 4*a*c
+
+        if discriminant <= 0:
+            return False
+        t1 = (-b + math.sqrt(discriminant)) / (2*a)
+        t2 = (-b - math.sqrt(discriminant)) / (2*a)
+       
+        y1 = r.origin.y + t1*r.direction.y
+        y2 = r.origin.y + t2*r.direction.y
+
+        ts = []
+        if (self.center.y - self.half_length) < y1 < (self.center.y + self.half_length):
+            ts.append(t1)
+        if (self.center.y - self.half_length) < y2 < (self.center.y + self.half_length):
+            ts.append(t2)
+        if not ts:
+            return False
+        else: 
+            t = np.min(ts)
+
+        # find the nearest root that lies in the acceptable range
+        if not ray_t.surrounds(t):
+            return False
+       
+        rec.t = t
+        rec.p = r.at(rec.t)
+        outward_normal = self.calc_normal(rec.p, direction="outward")
+        rec.set_face_normal(r, outward_normal)
+        rec.material = self.material
+        
+        return True
+
+    def calc_normal(self, p, direction="outward"):
+        """
+        Calculate normal to surface
+
+        Parameters
+        ----------
+        p : point3
+            point at which to calculate normal
+        direction : str
+            "outward" (default) or "inward"
+        """
+
+        if direction == "inward":
+            return vec3(p.x - self.center.x, 0, p.z - self.center.z) / self.radius
+        elif direction == "outward":
+            return vec3(self.center.x - p.x, 0, self.center.z - p.z) / self.radius
 
 
 class material():
