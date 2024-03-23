@@ -1062,6 +1062,120 @@ class cylinder(hittable):
             return vec3(self.center.x - p.x, 0, self.center.z - p.z) / self.radius
 
 
+class cone(hittable):
+    """
+    Cone
+    """
+
+    def __init__(self, center, radius, height, mat):
+        """
+        Initialize a new cone
+
+        Parameters
+        ----------
+        center : point3
+            center point of cone, defined as the middle of base
+        radius : float
+            radius of cone
+        height : float
+            height of cone
+        mat : material
+            material of sphere
+        """
+
+        # let center refer to the base
+        center.y += height
+
+        super().__init__(center)
+        self.radius = radius
+        self.height = height
+        self.material = mat
+
+    def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
+        """
+        Determine cone color based on ray
+
+        Parameters
+        ----------
+        ray : vec3
+            3d vector of ray
+        ray_tmin : float
+            minimum t
+        ray_tmax : float
+            maximum t
+        rec: hit_record
+            hit record
+        
+        Returns
+        -------
+        out : float
+            color value
+        """
+
+        # solve quadratic
+        a = r.direction.x**2 + r.direction.z**2 - r.direction.y**2
+        b = 2 * (r.direction.x * (r.origin.x - self.center.x) + \
+                 r.direction.z * (r.origin.z - self.center.z) - \
+                 r.direction.y * (r.origin.y - self.center.y))
+        c = (r.origin.x - self.center.x)**2 + (r.origin.z - self.center.z)**2 - \
+            (r.origin.y - self.center.y)**2
+        discriminant = b**2 - 4*a*c
+
+        if discriminant <= 0:
+            return False
+        t1 = (-b + math.sqrt(discriminant)) / (2*a)
+        t2 = (-b - math.sqrt(discriminant)) / (2*a)
+
+        #t = np.min((t1,t2))
+       
+        y1 = r.origin.y + t1*r.direction.y
+        y2 = r.origin.y + t2*r.direction.y
+
+        ts = []
+        if (self.center.y - self.height) < y1 < (self.center.y):
+            ts.append(t1)
+        if (self.center.y - self.height) < y2 < (self.center.y):
+            ts.append(t2)
+        if not ts:
+            return False
+        else: 
+            t = np.min(ts)
+
+
+        # find the nearest root that lies in the acceptable range
+        if not ray_t.surrounds(t):
+            return False
+       
+        rec.t = t
+        rec.p = r.at(rec.t)
+        outward_normal = self.calc_normal(rec.p, direction="outward")
+        rec.set_face_normal(r, outward_normal)
+        rec.material = self.material
+        
+        return True
+
+    def calc_normal(self, p, direction="outward"):
+        """
+        Calculate normal to surface
+
+        Parameters
+        ----------
+        p : point3
+            point at which to calculate normal
+        direction : str
+            "outward" (default) or "inward"
+        """
+
+        r = math.sqrt((p.x - self.center.x)**2 + (p.z - self.center.z)**2)
+        if p.y > self.center.y:
+            r *= -1
+            direction = "inward"
+        if direction == "inward":
+            return vec3(p.x - self.center.x, r, p.z - self.center.z).unit_vector()
+        elif direction == "outward":
+            return -1*vec3(p.x - self.center.x, r, p.z - self.center.z).unit_vector()
+
+
 class material():
     """
     Material
