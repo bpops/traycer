@@ -1016,8 +1016,10 @@ class cylinder(hittable):
 
         if discriminant <= 0:
             return False
-        t1 = (-b + math.sqrt(discriminant)) / (2*a)
-        t2 = (-b - math.sqrt(discriminant)) / (2*a)
+        else:
+            sqrtd = math.sqrt(discriminant)
+        t1 = (-b + sqrtd) / (2*a)
+        t2 = (-b - sqrtd) / (2*a)
        
         y1 = r.origin.y + t1*r.direction.y
         y2 = r.origin.y + t2*r.direction.y
@@ -1089,6 +1091,7 @@ class cone(hittable):
         super().__init__(center)
         self.radius = radius
         self.height = height
+        self.tan    = (radius/height)**2
         self.material = mat
 
     def hit(self, r, ray_t=interval(-1*np.inf, np.inf), rec=None):
@@ -1113,20 +1116,21 @@ class cone(hittable):
         """
 
         # solve quadratic
-        a = r.direction.x**2 + r.direction.z**2 - r.direction.y**2
+        a = r.direction.x**2 + r.direction.z**2 - \
+            self.tan*r.direction.y**2
         b = 2 * (r.direction.x * (r.origin.x - self.center.x) + \
                  r.direction.z * (r.origin.z - self.center.z) - \
-                 r.direction.y * (r.origin.y - self.center.y))
+                 self.tan * r.direction.y * (r.origin.y - self.center.y))
         c = (r.origin.x - self.center.x)**2 + (r.origin.z - self.center.z)**2 - \
-            (r.origin.y - self.center.y)**2
+            self.tan * (r.origin.y - self.center.y)**2
         discriminant = b**2 - 4*a*c
 
         if discriminant <= 0:
             return False
-        t1 = (-b + math.sqrt(discriminant)) / (2*a)
-        t2 = (-b - math.sqrt(discriminant)) / (2*a)
-
-        #t = np.min((t1,t2))
+        else:
+            sqrtd = math.sqrt(discriminant)
+        t1 = (-b + sqrtd) / (2*a)
+        t2 = (-b - sqrtd) / (2*a)
        
         y1 = r.origin.y + t1*r.direction.y
         y2 = r.origin.y + t2*r.direction.y
@@ -1140,7 +1144,6 @@ class cone(hittable):
             return False
         else: 
             t = np.min(ts)
-
 
         # find the nearest root that lies in the acceptable range
         if not ray_t.surrounds(t):
