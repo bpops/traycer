@@ -7,5 +7,5 @@ setuptools.setup(name='traycer',
       url='https://github.com/bpops/traycer',
       author='bpops',
       license='MIT',
-      install_requires=['numpy',],
+      install_requires=['numpy','tqdm'],
       zip_safe=False)
